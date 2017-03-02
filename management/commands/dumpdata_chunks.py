@@ -2,9 +2,38 @@ from django.core.exceptions import ImproperlyConfigured
 from django.core.management.base import BaseCommand, CommandError
 from django.core import serializers
 from django.db import router, DEFAULT_DB_ALIAS
-from django.utils.datastructures import SortedDict
 
 from optparse import make_option
+
+
+''' Django compatibility - BEGIN '''
+try:
+    from django.utils.datastructures import SortedDict
+except:
+    from collections import OrderedDict
+    SortedDict = OrderedDict
+
+
+try:
+    from django.db.models.get_apps import get_app, get_apps, get_model, get_models
+
+except:
+    from django.apps import apps
+
+    def get_app(label):
+        return apps.get_app_config(label)
+
+    def get_apps():
+        return [a for a in apps.get_app_configs()]
+
+    def get_models(app_config):
+        ''' nahrazuje from django.db.models.get_models '''
+        return app_config.get_models()
+
+    get_model = apps.get_model
+
+''' Django compatibility - END '''
+
 
 class Command(BaseCommand):
     option_list = BaseCommand.option_list + (
@@ -32,11 +61,9 @@ class Command(BaseCommand):
     args = '[appname appname.ModelName ...]'
 
     def handle(self, *app_labels, **options):
-        from django.db.models import get_app, get_apps, get_model
-
         output_folder = options.get('output_folder')
-        print "Output folder:", output_folder
-        print "NOTE: See --output-folder option"
+        print ("Output folder:", output_folder)
+        print ("NOTE: See --output-folder option")
         max_records_per_chunk = options.get('max_records_per_chunk')
         format = options.get('format')
         indent = options.get('indent')
@@ -110,23 +137,23 @@ class Command(BaseCommand):
         model_count = 1000
         chunk_count = 1000
         for model in sort_dependencies(app_list.items()):
-            model_count += 1 
+            model_count += 1
             if model in excluded_models:
                 continue
-            if not model._meta.proxy and router.allow_syncdb(using, model):
+            if not model._meta.proxy and router.allow_migrate(using, model):
                 if use_base_manager:
                     objects.extend(model._base_manager.using(using).all())
                 else:
                     items_total = model._default_manager.using(using).count()
-                    chunks_total = (items_total / max_records_per_chunk) +1
+                    chunks_total = int((items_total / max_records_per_chunk) +1) # neni potreba jeste pricist 1? float je nekde kolem 1.000025
                     for chunk_num in range(0, chunks_total):
-                        output_objects = model._default_manager.using(using).all().order_by('id')[chunk_num*max_records_per_chunk:(chunk_num+1)*max_records_per_chunk]
+                        output_objects = model._default_manager.using(using).all().order_by('pk')[chunk_num*max_records_per_chunk:(chunk_num+1)*max_records_per_chunk]
                         if output_objects:
-                            chunk_count += 1 
+                            chunk_count += 1
                             dump_file_name = output_folder + "/%d_%d.json" % (model_count, chunk_count)
-                            print "Dumping file: %s [%d]" % (dump_file_name, chunks_total)
+                            print ("Dumping file: %s [%d]" % (dump_file_name, chunks_total))
                             output = serializers.serialize(format, output_objects, indent=indent,
-                                        use_natural_keys=use_natural_keys)
+                                        use_natural_foreign_keys=use_natural_keys)
                             with open(dump_file_name, "w") as dumpfile:
                                 dumpfile.write(output)
         return ''
@@ -138,7 +165,7 @@ def sort_dependencies(app_list):
     is serialized before a normal model, and any model with a natural key
     dependency has it's dependencies serialized first.
     """
-    from django.db.models import get_model, get_models
+    #from django.db.models import get_model, get_models
     # Process the list of models, and get the list of dependencies
     model_dependencies = []
     models = set()
