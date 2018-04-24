@@ -11,17 +11,19 @@ Example usage:
 
 1) Dump data into many files:
 
-`mkdir some-folder`
-`./manage.py dumpdata_chunks your-app-name --output-folder=./some-folder --max-records-per-chunk=100000`
-
+```mkdir some-folder
+./manage.py dumpdata_chunks your-app-name --output-folder=./some-folder --max-records-per-chunk=100000
+```
 2) Load data from the folder:
 
 <del>`find ./some-folder | egrep -o "([0-9]+_[0-9]+)" | xargs ./manage.py loaddata`.</del> This method does not seem to run `loaddata` on the fixture's full path.
 
 NOTE: you can also generate a script to load data:
 
-`find ./some-folder | egrep -o "([0-9]+_[0-9]+)" |sort | awk '{print "./manage.py loaddata ./some-folder/"$1".json"}' > script-to-loaddata.sh`
-`./script-to-loaddata.sh`
+```
+find ./some-folder | egrep -o "([0-9]+_[0-9]+)" |sort | awk '{print "./manage.py loaddata ./some-folder/"$1".json"}' > script-to-loaddata.sh
+./script-to-loaddata.sh
+```
 
 GENERAL LINKS:
 
